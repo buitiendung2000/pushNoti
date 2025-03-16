@@ -16,20 +16,36 @@ app.use(bodyParser.json());
 
 // ✅ Endpoint nhận request từ Flutter app
 app.post('/sendFCM', async (req, res) => {
-    const { roomNo, paymentMethod } = req.body;
+    const { roomNo, paymentMethod, ownerPhone } = req.body;
 
-    // 👉 Thay token của chủ trọ ở đây
-    const deviceToken = 'dyGJPyCCRJ62gTj3YncHwB:APA91bHn_zrN5erZs53OIqVjKDnhwvNP7zyYP8uTSTxQz0R2E7yFk44lj4jM_VVxOuUEWFTTYsq3s7XJ8FHDWDfdFqXBt1Piy97UIqDnM6F4Lf4bDmf-NfA';
-
-    const message = {
-        notification: {
-            title: 'Thanh toán phòng trọ',
-            body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}`,
-        },
-        token: deviceToken,
-    };
+    if (!ownerPhone) {
+        return res.status(400).send({ success: false, error: 'ownerPhone is required' });
+    }
 
     try {
+        // 🔍 Tìm người dùng chủ trọ theo số điện thoại
+        const userDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
+
+        if (!userDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
+
+        const userData = userDoc.data();
+        const deviceToken = userData.deviceToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
+
+        // 📨 Gửi thông báo FCM
+        const message = {
+            notification: {
+                title: 'Thanh toán phòng trọ',
+                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}`,
+            },
+            token: deviceToken,
+        };
+
         const response = await admin.messaging().send(message);
         console.log('✅ Thông báo đã gửi:', response);
         res.status(200).send({ success: true, response });
@@ -39,6 +55,7 @@ app.post('/sendFCM', async (req, res) => {
     }
 });
 
+// ✅ Kiểm tra server
 app.get('/', (req, res) => {
     res.send('🔔 FCM Server is running!');
 });
