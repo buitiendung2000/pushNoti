@@ -16,11 +16,10 @@ app.use(bodyParser.json());
 
 // ✅ Endpoint nhận request từ Flutter app
 app.post('/sendFCM', async (req, res) => {
-    const { roomNo, paymentMethod, ownerPhone } = req.body;
+    const { roomNo, paymentMethod } = req.body;
 
-    if (!ownerPhone) {
-        return res.status(400).send({ success: false, error: 'ownerPhone is required' });
-    }
+    // ✅ Gán cứng số điện thoại chủ trọ
+    const ownerPhone = '+84906950367';
 
     try {
         // 🔍 Tìm người dùng chủ trọ theo số điện thoại
@@ -31,7 +30,7 @@ app.post('/sendFCM', async (req, res) => {
         }
 
         const userData = userDoc.data();
-        const deviceToken = userData.deviceToken;
+        const deviceToken = userData.fcmToken;
 
         if (!deviceToken) {
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
@@ -54,6 +53,7 @@ app.post('/sendFCM', async (req, res) => {
         res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 // ✅ Kiểm tra server
 app.get('/', (req, res) => {
