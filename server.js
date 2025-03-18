@@ -14,15 +14,14 @@ admin.initializeApp({
 
 app.use(bodyParser.json());
 
-// ✅ Endpoint nhận request từ Flutter app
+/* ============================================
+   ✅ Gửi thông báo cho CHỦ TRỌ
+============================================ */
 app.post('/sendFCM', async (req, res) => {
     const { roomNo, paymentMethod } = req.body;
-
-    // ✅ Gán cứng số điện thoại chủ trọ
-    const ownerPhone = '+84906950367';
+    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
 
     try {
-        // 🔍 Tìm người dùng chủ trọ theo số điện thoại
         const userDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
 
         if (!userDoc.exists) {
@@ -36,7 +35,6 @@ app.post('/sendFCM', async (req, res) => {
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
-        // 📨 Gửi thông báo FCM
         const message = {
             notification: {
                 title: 'Thanh toán phòng trọ',
@@ -46,7 +44,7 @@ app.post('/sendFCM', async (req, res) => {
         };
 
         const response = await admin.messaging().send(message);
-        console.log('✅ Thông báo đã gửi:', response);
+        console.log('✅ Thông báo đã gửi cho chủ trọ:', response);
         res.status(200).send({ success: true, response });
     } catch (error) {
         console.error('❌ Lỗi gửi thông báo:', error);
@@ -54,8 +52,43 @@ app.post('/sendFCM', async (req, res) => {
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo cho NGƯỜI THUÊ TRỌ
+============================================ */
+app.post('/sendTenantNoti', async (req, res) => {
+    const { tenantPhone, title, body } = req.body;
 
-// ✅ Kiểm tra server
+    try {
+        const tenantDoc = await admin.firestore().collection('users').doc(tenantPhone).get();
+
+        if (!tenantDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy người thuê' });
+        }
+
+        const tenantData = tenantDoc.data();
+        const deviceToken = tenantData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Người thuê chưa đăng ký deviceToken' });
+        }
+
+        const message = {
+            notification: { title, body },
+            token: deviceToken,
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log('✅ Thông báo đã gửi cho người thuê:', response);
+        res.status(200).send({ success: true, response });
+    } catch (error) {
+        console.error('❌ Lỗi gửi thông báo người thuê:', error);
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
+
+/* ============================================
+   ✅ Kiểm tra server
+============================================ */
 app.get('/', (req, res) => {
     res.send('🔔 FCM Server is running!');
 });
