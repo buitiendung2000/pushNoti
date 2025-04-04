@@ -87,6 +87,47 @@ app.post('/sendTenantNoti', async (req, res) => {
 });
 
 /* ============================================
+   ✅ Gửi thông báo tin nhắn
+============================================ */
+app.post('/sendMessageNoti', async (req, res) => {
+    const { senderPhone, receiverPhone, message } = req.body;
+
+    try {
+        // Lấy thông tin người nhận
+        const receiverDoc = await admin.firestore().collection('users').doc(receiverPhone).get();
+
+        if (!receiverDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy người nhận' });
+        }
+
+        const receiverData = receiverDoc.data();
+        const deviceToken = receiverData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Người nhận chưa đăng ký deviceToken' });
+        }
+
+        // Cấu trúc thông báo
+        const notificationMessage = {
+            notification: {
+                title: `Tin nhắn mới từ ${senderPhone}`,
+                body: message,
+            },
+            token: deviceToken,
+        };
+
+        // Gửi thông báo
+        const response = await admin.messaging().send(notificationMessage);
+        console.log('✅ Thông báo đã gửi:', response);
+
+        res.status(200).send({ success: true, response });
+    } catch (error) {
+        console.error('❌ Lỗi khi gửi thông báo tin nhắn:', error);
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
+
+/* ============================================
    ✅ Kiểm tra server
 ============================================ */
 app.get('/', (req, res) => {
