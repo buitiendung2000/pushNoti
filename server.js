@@ -97,6 +97,7 @@ app.post('/sendMessageNoti', async (req, res) => {
         const receiverDoc = await admin.firestore().collection('users').doc(receiverPhone).get();
 
         if (!receiverDoc.exists) {
+            console.log('Lỗi: Không tìm thấy người nhận');
             return res.status(404).send({ success: false, error: 'Không tìm thấy người nhận' });
         }
 
@@ -104,6 +105,7 @@ app.post('/sendMessageNoti', async (req, res) => {
         const deviceToken = receiverData.fcmToken;
 
         if (!deviceToken) {
+            console.log('Lỗi: Người nhận chưa đăng ký deviceToken');
             return res.status(404).send({ success: false, error: 'Người nhận chưa đăng ký deviceToken' });
         }
 
@@ -122,10 +124,11 @@ app.post('/sendMessageNoti', async (req, res) => {
 
         res.status(200).send({ success: true, response });
     } catch (error) {
-        console.error('❌ Lỗi khi gửi thông báo tin nhắn:', error);
+        console.error('❌ Lỗi khi gửi thông báo tin nhắn:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 /* ============================================
    ✅ Kiểm tra server
