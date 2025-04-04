@@ -92,40 +92,43 @@ app.post('/sendTenantNoti', async (req, res) => {
 app.post('/sendMessageNoti', async (req, res) => {
     const { senderPhone, receiverPhone, message } = req.body;
 
-    console.log('Sender phone:', senderPhone);
-    console.log('Receiver phone:', receiverPhone);  // Ghi log số điện thoại người nhận để debug
-
     try {
+        // Lấy thông tin người nhận
         const receiverDoc = await admin.firestore().collection('users').doc(receiverPhone).get();
 
         if (!receiverDoc.exists) {
-            console.log('Receiver not found in Firestore:', receiverPhone);
+            console.log('Lỗi: Không tìm thấy người nhận');
             return res.status(404).send({ success: false, error: 'Không tìm thấy người nhận' });
         }
 
         const receiverData = receiverDoc.data();
-        const fcmToken = receiverData?.fcmToken;
+        const deviceToken = receiverData.fcmToken;
 
-        if (!fcmToken) {
+        if (!deviceToken) {
+            console.log('Lỗi: Người nhận chưa đăng ký deviceToken');
             return res.status(404).send({ success: false, error: 'Người nhận chưa đăng ký deviceToken' });
         }
 
+        // Cấu trúc thông báo
         const notificationMessage = {
             notification: {
                 title: `Tin nhắn mới từ ${senderPhone}`,
                 body: message,
             },
-            token: fcmToken,
+            token: deviceToken,
         };
 
-        await admin.messaging().send(notificationMessage);
-        res.status(200).send({ success: true, message: 'Thông báo đã gửi' });
+        // Gửi thông báo
+        const response = await admin.messaging().send(notificationMessage);
+        console.log('✅ Thông báo đã gửi:', response);
 
+        res.status(200).send({ success: true, response });
     } catch (error) {
-        console.error('Lỗi khi gửi thông báo:', error);
+        console.error('❌ Lỗi khi gửi thông báo tin nhắn:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 
 /* ============================================
