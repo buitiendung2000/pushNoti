@@ -103,6 +103,13 @@ app.post('/sendMessageNoti', async (req, res) => {
 
         const receiverData = receiverDoc.data();
         const deviceToken = receiverData.fcmToken;
+        const isOnline = receiverData.isOnline;  // Kiểm tra trạng thái online
+
+        // Kiểm tra trạng thái online của người nhận
+        if (isOnline) {
+            console.log('Người nhận đang online, không gửi thông báo');
+            return res.status(200).send({ success: true, message: 'Người nhận đang online, không gửi thông báo.' });
+        }
 
         if (!deviceToken) {
             console.log('Lỗi: Người nhận chưa đăng ký deviceToken');
