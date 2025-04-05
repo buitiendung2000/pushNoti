@@ -18,7 +18,7 @@ app.use(bodyParser.json());
    ✅ Gửi thông báo cho CHỦ TRỌ
 ============================================ */
 app.post('/sendFCM', async (req, res) => {
-    const { roomNo, paymentMethod } = req.body;
+    const { roomNo, paymentMethod, grandTotal } = req.body;  // Thêm amount vào body
     const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
 
     try {
@@ -38,7 +38,7 @@ app.post('/sendFCM', async (req, res) => {
         const message = {
             notification: {
                 title: 'Thanh toán phòng trọ',
-                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}`,
+                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}. Số tiền thanh toán: ${grandTotal} VND`, // Thêm số tiền vào thông báo
             },
             token: deviceToken,
         };
@@ -51,6 +51,7 @@ app.post('/sendFCM', async (req, res) => {
         res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 /* ============================================
    ✅ Gửi thông báo cho NGƯỜI THUÊ TRỌ
