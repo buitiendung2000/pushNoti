@@ -141,7 +141,7 @@ app.post('/sendMessageNoti', async (req, res) => {
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
     // req.body dự kiến có các trường: phoneNumber, selectedIssues, additionalFeedback
-    const { phoneNumber, selectedIssues, additionalFeedback } = req.body;
+    const { roomNo, selectedIssues, additionalFeedback } = req.body;
     const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ; có thể thay đổi theo logic dự án
 
     try {
@@ -163,7 +163,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
         const message = {
             notification: {
                 title: 'Phản hồi mới từ người thuê',
-                body: `SĐT: ${phoneNumber}\n${issuesText}${additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''}`,
+                body: `Phòng trọ số ${roomNo}\nIssues: ${phoneNumber}\n${issuesText}${additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''}`,
             },
             token: deviceToken,
         };
