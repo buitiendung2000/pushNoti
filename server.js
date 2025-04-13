@@ -140,8 +140,8 @@ app.post('/sendMessageNoti', async (req, res) => {
    ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
-    // req.body dự kiến có các trường: phoneNumber, selectedIssues, additionalFeedback
-    const { roomNo, selectedIssues, additionalFeedback } = req.body;
+    // req.body dự kiến có các trường: roomNo, phoneNumber, selectedIssues, additionalFeedback
+    const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
     const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ; có thể thay đổi theo logic dự án
 
     try {
@@ -158,12 +158,14 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
-        // Nếu selectedIssues là mảng, chuyển đổi thành chuỗi, sau đó xây dựng nội dung thông báo
+        // Nếu selectedIssues là mảng, chuyển đổi thành chuỗi
         let issuesText = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : '';
+
+        // Xây dựng thông báo với tiêu đề và nội dung phù hợp
         const message = {
             notification: {
-                title: 'Phản hồi mới từ người thuê',
-                body: `Phòng trọ số ${roomNo}\nIssues: ${phoneNumber}\n${issuesText}${additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''}`,
+                title: `Bạn nhận góp ý từ Phòng trọ số ${roomNo}`,
+                body: `Từ người thuê: ${phoneNumber}\nIssues: ${issuesText}${additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''}`,
             },
             token: deviceToken,
         };
