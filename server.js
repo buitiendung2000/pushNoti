@@ -15,10 +15,10 @@ admin.initializeApp({
 app.use(bodyParser.json());
 
 /* ============================================
-   ✅ Gửi thông báo cho CHỦ TRỌ
+   ✅ Gửi thông báo cho CHỦ TRọ (Thanh toán)
 ============================================ */
 app.post('/sendFCM', async (req, res) => {
-    const { roomNo, paymentMethod, grandTotal } = req.body;  // Thêm amount vào body
+    const { roomNo, paymentMethod, grandTotal } = req.body;  // Thêm số tiền thanh toán vào body
     const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
 
     try {
@@ -38,7 +38,7 @@ app.post('/sendFCM', async (req, res) => {
         const message = {
             notification: {
                 title: 'Thanh toán phòng trọ',
-                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}. Số tiền thanh toán: ${grandTotal} VND`, // Thêm số tiền vào thông báo
+                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}. Số tiền thanh toán: ${grandTotal} VND`,
             },
             token: deviceToken,
         };
@@ -52,9 +52,8 @@ app.post('/sendFCM', async (req, res) => {
     }
 });
 
-
 /* ============================================
-   ✅ Gửi thông báo cho NGƯỜI THUÊ TRỌ
+   ✅ Gửi thông báo cho NGƯỜI THUÊ TRọ
 ============================================ */
 app.post('/sendTenantNoti', async (req, res) => {
     const { tenantPhone, title, body } = req.body;
@@ -137,7 +136,46 @@ app.post('/sendMessageNoti', async (req, res) => {
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
+============================================ */
+app.post('/sendFeedbackNoti', async (req, res) => {
+    // req.body dự kiến có các trường: phoneNumber, selectedIssues, additionalFeedback
+    const { phoneNumber, selectedIssues, additionalFeedback } = req.body;
+    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ; có thể thay đổi theo logic dự án
 
+    try {
+        const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
+
+        if (!ownerDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
+
+        const ownerData = ownerDoc.data();
+        const deviceToken = ownerData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
+
+        // Nếu selectedIssues là mảng, chuyển đổi thành chuỗi, sau đó xây dựng nội dung thông báo
+        let issuesText = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : '';
+        const message = {
+            notification: {
+                title: 'Phản hồi mới từ người thuê',
+                body: `SĐT: ${phoneNumber}\n${issuesText}${additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''}`,
+            },
+            token: deviceToken,
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log('✅ Thông báo phản hồi đã gửi cho chủ trọ:', response);
+        res.status(200).send({ success: true, response });
+    } catch (error) {
+        console.error('❌ Lỗi gửi thông báo phản hồi:', error.message);
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
 
 /* ============================================
    ✅ Kiểm tra server
