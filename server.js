@@ -12,7 +12,9 @@ admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
 });
 
+// Sử dụng middleware để parse dữ liệu JSON và URL-encoded
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 /* ============================================
    ✅ Gửi thông báo cho CHỦ TRọ (Thanh toán)
@@ -23,7 +25,6 @@ app.post('/sendFCM', async (req, res) => {
 
     try {
         const userDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
-
         if (!userDoc.exists) {
             return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
         }
@@ -47,7 +48,7 @@ app.post('/sendFCM', async (req, res) => {
         console.log('✅ Thông báo đã gửi cho chủ trọ:', response);
         res.status(200).send({ success: true, response });
     } catch (error) {
-        console.error('❌ Lỗi gửi thông báo:', error);
+        console.error('❌ Lỗi gửi thông báo:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
@@ -81,7 +82,7 @@ app.post('/sendTenantNoti', async (req, res) => {
         console.log('✅ Thông báo đã gửi cho người thuê:', response);
         res.status(200).send({ success: true, response });
     } catch (error) {
-        console.error('❌ Lỗi gửi thông báo người thuê:', error);
+        console.error('❌ Lỗi gửi thông báo người thuê:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
@@ -141,7 +142,7 @@ app.post('/sendMessageNoti', async (req, res) => {
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
     // In log toàn bộ dữ liệu nhận được từ request để debug
-    console.log('Incoming feedback notification request:', req.body);
+    console.log('[DEBUG] Incoming feedback notification request:', req.body);
 
     // Đọc các trường từ request body
     const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
@@ -149,7 +150,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
 
     // Kiểm tra nếu roomNo hoặc phoneNumber chưa có
     if (!roomNo || !phoneNumber) {
-        console.error('Thiếu thông tin: roomNo hoặc phoneNumber');
+        console.error('[ERROR] Thiếu thông tin: roomNo hoặc phoneNumber');
         return res.status(400).send({ success: false, error: 'roomNo và phoneNumber là bắt buộc.' });
     }
 
@@ -158,7 +159,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
 
         if (!ownerDoc.exists) {
-            console.error('Không tìm thấy chủ trọ với phone:', ownerPhone);
+            console.error('[ERROR] Không tìm thấy chủ trọ với phone:', ownerPhone);
             return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
         }
 
@@ -166,7 +167,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
         const deviceToken = ownerData.fcmToken;
 
         if (!deviceToken) {
-            console.error('Chủ trọ chưa đăng ký deviceToken.');
+            console.error('[ERROR] Chủ trọ chưa đăng ký deviceToken.');
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
@@ -181,7 +182,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
         }
 
         // Xây dựng payload thông báo với tiêu đề và nội dung hiển thị đúng
-        const message = {
+        const payload = {
             notification: {
                 title: `Bạn nhận góp ý từ phòng trọ số ${roomNo}`,
                 body: `Từ người thuê: ${phoneNumber}\nVấn đề: ${issuesText}` +
@@ -190,16 +191,19 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             token: deviceToken,
         };
 
-        // Gửi thông báo qua FCM
-        const sendResponse = await admin.messaging().send(message);
-        console.log('✅ Thông báo phản hồi đã gửi cho chủ trọ:', sendResponse);
+        // In log payload để debug
+        console.log('[DEBUG] Payload thông báo:', payload);
+
+        // Gửi thông báo qua Firebase Cloud Messaging
+        const sendResponse = await admin.messaging().send(payload);
+        console.log('[DEBUG] FCM Response:', sendResponse);
+
         return res.status(200).send({ success: true, response: sendResponse });
     } catch (error) {
-        console.error('❌ Lỗi gửi thông báo phản hồi:', error.message);
+        console.error('[ERROR] Lỗi gửi thông báo phản hồi:', error.message);
         return res.status(500).send({ success: false, error: error.message });
     }
 });
-
 
 /* ============================================
    ✅ Kiểm tra server
