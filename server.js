@@ -140,17 +140,16 @@ app.post('/sendMessageNoti', async (req, res) => {
    ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
-    // req.body dự kiến có các trường: roomNo, phoneNumber, selectedIssues, additionalFeedback
+    // Yêu cầu body có roomNo, phoneNumber, selectedIssues, additionalFeedback
     const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
-    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ; có thể thay đổi theo logic dự án
+    const ownerPhone = '+84906950367'; // Số điện thoại chủ trọ
 
     try {
+        // Lấy fcmToken của chủ trọ
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
-
         if (!ownerDoc.exists) {
             return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
         }
-
         const ownerData = ownerDoc.data();
         const deviceToken = ownerData.fcmToken;
 
@@ -158,10 +157,9 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
-        // Nếu selectedIssues là mảng, chuyển đổi thành chuỗi
-        let issuesText = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : '';
+        let issuesText = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : selectedIssues;
 
-        // Xây dựng thông báo với tiêu đề và nội dung phù hợp
+        // Tạo payload thông báo
         const message = {
             notification: {
                 title: `Bạn nhận góp ý từ Phòng trọ số ${roomNo}`,
@@ -178,6 +176,7 @@ app.post('/sendFeedbackNoti', async (req, res) => {
         res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 /* ============================================
    ✅ Kiểm tra server
