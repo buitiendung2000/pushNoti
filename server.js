@@ -140,24 +140,44 @@ app.post('/sendMessageNoti', async (req, res) => {
    ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
-    // Yêu cầu body có roomNo, phoneNumber, selectedIssues, additionalFeedback
+    // Log toàn bộ dữ liệu nhận được từ request
+    console.log('Incoming feedback notification request:', req.body);
+
+    // Yêu cầu body có các trường: roomNo, phoneNumber, selectedIssues, additionalFeedback
     const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
+
+    // Kiểm tra các trường bắt buộc: roomNo và phoneNumber
+    if (!roomNo || !phoneNumber) {
+        console.error('Thiếu roomNo hoặc phoneNumber trong request body.');
+        return res.status(400).send({ success: false, error: 'roomNo và phoneNumber là bắt buộc.' });
+    }
+
     const ownerPhone = '+84906950367'; // Số điện thoại chủ trọ
 
     try {
-        // Lấy fcmToken của chủ trọ
+        // Lấy fcmToken của chủ trọ từ collection 'users'
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
         if (!ownerDoc.exists) {
+            console.error(`Không tìm thấy tài liệu của chủ trọ với phone ${ownerPhone}`);
             return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
         }
         const ownerData = ownerDoc.data();
         const deviceToken = ownerData.fcmToken;
 
         if (!deviceToken) {
+            console.error('Chủ trọ chưa đăng ký deviceToken.');
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
-        let issuesText = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : selectedIssues;
+        // Xử lý selectedIssues: nếu là mảng thì chuyển thành chuỗi, nếu không thì dùng trực tiếp
+        let issuesText = '';
+        if (Array.isArray(selectedIssues)) {
+            issuesText = selectedIssues.join(', ');
+        } else if (typeof selectedIssues === 'string') {
+            issuesText = selectedIssues;
+        } else {
+            issuesText = 'N/A';
+        }
 
         // Tạo payload thông báo
         const message = {
@@ -170,12 +190,13 @@ app.post('/sendFeedbackNoti', async (req, res) => {
 
         const response = await admin.messaging().send(message);
         console.log('✅ Thông báo phản hồi đã gửi cho chủ trọ:', response);
-        res.status(200).send({ success: true, response });
+        return res.status(200).send({ success: true, response });
     } catch (error) {
         console.error('❌ Lỗi gửi thông báo phản hồi:', error.message);
-        res.status(500).send({ success: false, error: error.message });
+        return res.status(500).send({ success: false, error: error.message });
     }
 });
+
 
 
 /* ============================================
