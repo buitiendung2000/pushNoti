@@ -54,6 +54,43 @@ app.post('/sendFCM', async (req, res) => {
 });
 
 /* ============================================
+   ✅ Gửi thông báo Trả phòng cho CHỦ TRọ
+============================================ */
+app.post('/sendCheckOutNoti', async (req, res) => {
+    const { roomNo, phoneNumber, fullName } = req.body; // Lấy thông tin phòng, SĐT và tên từ request body
+    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
+
+    try {
+        const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
+        if (!ownerDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
+
+        const ownerData = ownerDoc.data();
+        const deviceToken = ownerData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
+
+        const message = {
+            notification: {
+                title: 'Thông báo Trả phòng',
+                body: `Thông báo Trả phòng - Phòng trọ số ${roomNo} - SĐT: ${phoneNumber} - Tên: ${fullName}`,
+            },
+            token: deviceToken,
+        };
+
+        const response = await admin.messaging().send(message);
+        console.log('✅ Thông báo trả phòng đã gửi cho chủ trọ:', response);
+        res.status(200).send({ success: true, response });
+    } catch (error) {
+        console.error('❌ Lỗi gửi thông báo trả phòng:', error.message);
+        res.status(500).send({ success: false, error: error.message });
+    }
+});
+
+/* ============================================
    ✅ Gửi thông báo cho NGƯỜI THUÊ TRọ
 ============================================ */
 app.post('/sendTenantNoti', async (req, res) => {
@@ -141,21 +178,17 @@ app.post('/sendMessageNoti', async (req, res) => {
    ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
 ============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
-    // In log toàn bộ dữ liệu nhận được từ request để debug
     console.log('[DEBUG] Incoming feedback notification request:', req.body);
 
-    // Đọc các trường từ request body
     const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
-    const ownerPhone = '+84906950367'; // Số điện thoại chủ trọ (có thể thay đổi theo logic dự án)
+    const ownerPhone = '+84906950367';
 
-    // Kiểm tra nếu roomNo hoặc phoneNumber chưa có
     if (!roomNo || !phoneNumber) {
         console.error('[ERROR] Thiếu thông tin: roomNo hoặc phoneNumber');
         return res.status(400).send({ success: false, error: 'roomNo và phoneNumber là bắt buộc.' });
     }
 
     try {
-        // Lấy document của chủ trọ từ Firestore dựa trên ownerPhone
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
 
         if (!ownerDoc.exists) {
@@ -171,7 +204,6 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
         }
 
-        // Xử lý selectedIssues: nếu là mảng thì nối thành chuỗi, nếu là chuỗi thì dùng trực tiếp
         let issuesText = '';
         if (Array.isArray(selectedIssues)) {
             issuesText = selectedIssues.join(', ');
@@ -181,7 +213,6 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             issuesText = 'N/A';
         }
 
-        // Xây dựng payload thông báo với tiêu đề và nội dung hiển thị đúng
         const payload = {
             notification: {
                 title: `Bạn nhận góp ý từ phòng trọ số ${roomNo}`,
@@ -191,10 +222,8 @@ app.post('/sendFeedbackNoti', async (req, res) => {
             token: deviceToken,
         };
 
-        // In log payload để debug
         console.log('[DEBUG] Payload thông báo:', payload);
 
-        // Gửi thông báo qua Firebase Cloud Messaging
         const sendResponse = await admin.messaging().send(payload);
         console.log('[DEBUG] FCM Response:', sendResponse);
 
