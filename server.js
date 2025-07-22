@@ -4,96 +4,111 @@ const bodyParser = require('body-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ✅ Khởi tạo Firebase Admin SDK từ biến môi trường
-try {
-    const serviceAccountJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-    if (!serviceAccountJson) {
-        throw new Error('Biến môi trường GOOGLE_APPLICATION_CREDENTIALS_JSON chưa được cấu hình.');
-    }
+// ✅ Đọc file service account
+const serviceAccount = require('./dung60th1-b0c7b-firebase-adminsdk-4ku3w-104a94b576.json');
 
-    const serviceAccount = JSON.parse(serviceAccountJson);
+// ✅ Khởi tạo Firebase Admin SDK
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
 
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-
-    console.log('✅ Firebase Admin đã khởi tạo thành công');
-} catch (error) {
-    console.error('❌ Lỗi khởi tạo Firebase Admin:', error.message);
-    process.exit(1); // Dừng server nếu chưa khởi tạo Firebase thành công
-}
-
-// Middleware
+// Sử dụng middleware để parse dữ liệu JSON và URL-encoded
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// ============================================
-// ✅ Các route gửi thông báo (giữ nguyên)
-// ============================================
-
+/* ============================================
+   ✅ Gửi thông báo cho CHỦ TRọ (Thanh toán)
+============================================ */
 app.post('/sendFCM', async (req, res) => {
-    const { roomNo, paymentMethod, grandTotal } = req.body;
-    const ownerPhone = '+84906950367';
+    const { roomNo, paymentMethod, grandTotal } = req.body;  // Thêm số tiền thanh toán vào body
+    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
 
     try {
         const userDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
-        if (!userDoc.exists) return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        if (!userDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
 
-        const deviceToken = userDoc.data()?.fcmToken;
-        if (!deviceToken) return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        const userData = userDoc.data();
+        const deviceToken = userData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
 
         const message = {
             notification: {
                 title: 'Thanh toán phòng trọ',
-                body: `Phòng trọ số ${roomNo} - Thanh toán bằng ${paymentMethod}. Tổng: ${grandTotal} VND`,
+                body: `Phòng trọ số ${roomNo} - Lựa chọn thanh toán ${paymentMethod}. Số tiền thanh toán: ${grandTotal} VND`,
             },
             token: deviceToken,
         };
 
         const response = await admin.messaging().send(message);
-        console.log('✅ Gửi thông báo thành công:', response);
-        res.send({ success: true, response });
+        console.log('✅ Thông báo đã gửi cho chủ trọ:', response);
+        res.status(200).send({ success: true, response });
     } catch (error) {
         console.error('❌ Lỗi gửi thông báo:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo Trả phòng cho CHỦ TRọ
+============================================ */
 app.post('/sendCheckOutNoti', async (req, res) => {
-    const { roomNo, phoneNumber, fullName } = req.body;
-    const ownerPhone = '+84906950367';
+    const { roomNo, phoneNumber, fullName } = req.body; // Lấy thông tin phòng, SĐT và tên từ request body
+    const ownerPhone = '+84906950367'; // Gán cứng số điện thoại chủ trọ
 
     try {
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
-        if (!ownerDoc.exists) return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        if (!ownerDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
 
-        const deviceToken = ownerDoc.data()?.fcmToken;
-        if (!deviceToken) return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        const ownerData = ownerDoc.data();
+        const deviceToken = ownerData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
 
         const message = {
             notification: {
                 title: 'Thông báo Trả phòng',
-                body: `Phòng ${roomNo} - ${fullName} (${phoneNumber}) đã trả phòng.`,
+                body: `Thông báo Trả phòng - Phòng trọ số ${roomNo} - SĐT: ${phoneNumber} - Tên: ${fullName}`,
             },
             token: deviceToken,
         };
 
         const response = await admin.messaging().send(message);
-        res.send({ success: true, response });
+        console.log('✅ Thông báo trả phòng đã gửi cho chủ trọ:', response);
+        res.status(200).send({ success: true, response });
     } catch (error) {
+        console.error('❌ Lỗi gửi thông báo trả phòng:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo cho NGƯỜI THUÊ TRọ
+============================================ */
 app.post('/sendTenantNoti', async (req, res) => {
     const { tenantPhone, title, body } = req.body;
 
     try {
         const tenantDoc = await admin.firestore().collection('users').doc(tenantPhone).get();
-        if (!tenantDoc.exists) return res.status(404).send({ success: false, error: 'Không tìm thấy người thuê' });
 
-        const deviceToken = tenantDoc.data()?.fcmToken;
-        if (!deviceToken) return res.status(404).send({ success: false, error: 'Người thuê chưa đăng ký deviceToken' });
+        if (!tenantDoc.exists) {
+            return res.status(404).send({ success: false, error: 'Không tìm thấy người thuê' });
+        }
+
+        const tenantData = tenantDoc.data();
+        const deviceToken = tenantData.fcmToken;
+
+        if (!deviceToken) {
+            return res.status(404).send({ success: false, error: 'Người thuê chưa đăng ký deviceToken' });
+        }
 
         const message = {
             notification: { title, body },
@@ -101,27 +116,46 @@ app.post('/sendTenantNoti', async (req, res) => {
         };
 
         const response = await admin.messaging().send(message);
-        res.send({ success: true, response });
+        console.log('✅ Thông báo đã gửi cho người thuê:', response);
+        res.status(200).send({ success: true, response });
     } catch (error) {
+        console.error('❌ Lỗi gửi thông báo người thuê:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo tin nhắn
+============================================ */
 app.post('/sendMessageNoti', async (req, res) => {
     const { senderPhone, receiverPhone, message } = req.body;
 
     try {
+        // Lấy thông tin người nhận
         const receiverDoc = await admin.firestore().collection('users').doc(receiverPhone).get();
-        if (!receiverDoc.exists) return res.status(404).send({ success: false, error: 'Không tìm thấy người nhận' });
+
+        if (!receiverDoc.exists) {
+            console.log('Lỗi: Không tìm thấy người nhận');
+            return res.status(404).send({ success: false, error: 'Không tìm thấy người nhận' });
+        }
 
         const receiverData = receiverDoc.data();
-        const deviceToken = receiverData?.fcmToken;
-        const isOnline = receiverData?.isOnline;
+        const deviceToken = receiverData.fcmToken;
+        const isOnline = receiverData.isOnline;  // Kiểm tra trạng thái online
 
-        if (isOnline) return res.send({ success: true, message: 'Người nhận đang online, không gửi thông báo.' });
-        if (!deviceToken) return res.status(404).send({ success: false, error: 'Người nhận chưa đăng ký deviceToken' });
+        // Kiểm tra trạng thái online của người nhận
+        if (isOnline) {
+            console.log('Người nhận đang online, không gửi thông báo');
+            return res.status(200).send({ success: true, message: 'Người nhận đang online, không gửi thông báo.' });
+        }
 
-        const notification = {
+        if (!deviceToken) {
+            console.log('Lỗi: Người nhận chưa đăng ký deviceToken');
+            return res.status(404).send({ success: false, error: 'Người nhận chưa đăng ký deviceToken' });
+        }
+
+        // Cấu trúc thông báo
+        const notificationMessage = {
             notification: {
                 title: `Tin nhắn mới từ ${senderPhone}`,
                 body: message,
@@ -129,44 +163,80 @@ app.post('/sendMessageNoti', async (req, res) => {
             token: deviceToken,
         };
 
-        const response = await admin.messaging().send(notification);
-        res.send({ success: true, response });
+        // Gửi thông báo
+        const response = await admin.messaging().send(notificationMessage);
+        console.log('✅ Thông báo đã gửi:', response);
+
+        res.status(200).send({ success: true, response });
     } catch (error) {
+        console.error('❌ Lỗi khi gửi thông báo tin nhắn:', error.message);
         res.status(500).send({ success: false, error: error.message });
     }
 });
 
+/* ============================================
+   ✅ Gửi thông báo phản hồi từ người thuê đến CHỦ TRọ
+============================================ */
 app.post('/sendFeedbackNoti', async (req, res) => {
+    console.log('[DEBUG] Incoming feedback notification request:', req.body);
+
     const { roomNo, phoneNumber, selectedIssues, additionalFeedback } = req.body;
     const ownerPhone = '+84906950367';
 
+    if (!roomNo || !phoneNumber) {
+        console.error('[ERROR] Thiếu thông tin: roomNo hoặc phoneNumber');
+        return res.status(400).send({ success: false, error: 'roomNo và phoneNumber là bắt buộc.' });
+    }
+
     try {
         const ownerDoc = await admin.firestore().collection('users').doc(ownerPhone).get();
-        if (!ownerDoc.exists) return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
 
-        const deviceToken = ownerDoc.data()?.fcmToken;
-        if (!deviceToken) return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        if (!ownerDoc.exists) {
+            console.error('[ERROR] Không tìm thấy chủ trọ với phone:', ownerPhone);
+            return res.status(404).send({ success: false, error: 'Không tìm thấy chủ trọ' });
+        }
 
-        const issues = Array.isArray(selectedIssues) ? selectedIssues.join(', ') : (selectedIssues || 'N/A');
+        const ownerData = ownerDoc.data();
+        const deviceToken = ownerData.fcmToken;
+
+        if (!deviceToken) {
+            console.error('[ERROR] Chủ trọ chưa đăng ký deviceToken.');
+            return res.status(404).send({ success: false, error: 'Chủ trọ chưa đăng ký deviceToken' });
+        }
+
+        let issuesText = '';
+        if (Array.isArray(selectedIssues)) {
+            issuesText = selectedIssues.join(', ');
+        } else if (typeof selectedIssues === 'string') {
+            issuesText = selectedIssues;
+        } else {
+            issuesText = 'N/A';
+        }
 
         const payload = {
             notification: {
-                title: `Góp ý từ phòng ${roomNo}`,
-                body: `Người thuê: ${phoneNumber}\nVấn đề: ${issues}\n${additionalFeedback || ''}`,
+                title: `Bạn nhận góp ý từ phòng trọ số ${roomNo}`,
+                body: `Từ người thuê: ${phoneNumber}\nVấn đề: ${issuesText}` +
+                    (additionalFeedback ? `\nGóp ý: ${additionalFeedback}` : ''),
             },
             token: deviceToken,
         };
 
-        const response = await admin.messaging().send(payload);
-        res.send({ success: true, response });
+        console.log('[DEBUG] Payload thông báo:', payload);
+
+        const sendResponse = await admin.messaging().send(payload);
+        console.log('[DEBUG] FCM Response:', sendResponse);
+
+        return res.status(200).send({ success: true, response: sendResponse });
     } catch (error) {
-        res.status(500).send({ success: false, error: error.message });
+        console.error('[ERROR] Lỗi gửi thông báo phản hồi:', error.message);
+        return res.status(500).send({ success: false, error: error.message });
     }
 });
 
-// ============================================
-// ✅ Route kiểm tra server
-// ============================================
+/* ============================================
+   ✅ Kiểm tra server
+============================================ */
 app.get('/', (req, res) => {
     res.send('🔔 FCM Server is running!');
 });
